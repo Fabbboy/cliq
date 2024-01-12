@@ -1,0 +1,7 @@
+[workspace]
+members = ["cliq-lexer", "cliq-parser"]
+resolver = "2"
+
+[workspace.dependencies]
+nom = "7.1.2"
+regex = "1.5.4"
