@@ -8,4 +8,7 @@ pub enum TokenT {
 
   //OPERATOR
   OPERATOR, // + * - / % =
+
+  //SYMBOL
+  BRACKET, // ( ) [ ] { }
 }

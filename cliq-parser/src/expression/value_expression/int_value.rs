@@ -2,7 +2,7 @@ use crate::expression::Expression;
 
 use super::ValueExpression;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct IntValue {
   value: i32,
 }

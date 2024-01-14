@@ -1,13 +1,4 @@
-extern crate nom;
-
 use cliq_lexer::{token::Token, token_t::TokenT};
-use nom::{
-  branch::alt,
-  combinator::map,
-  error::Error,
-  sequence::{delimited, tuple},
-  IResult,
-};
 
 use crate::{
   expression::{
@@ -37,6 +28,22 @@ fn get_precedence(opr: &str) -> i32 {
   }
 }
 
+struct LangError {
+  msg: String,
+}
+
+impl LangError {
+  fn new(msg: &str) -> LangError {
+    LangError { msg: msg.to_string() }
+  }
+}
+
+impl std::fmt::Debug for LangError {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{:#?}", self.msg)
+  }
+}
+
 //we want to strictly use nom to parse the tokens
 impl Parser {
   pub fn new(input_tokens: Vec<Token>) -> Parser {
@@ -58,76 +65,124 @@ impl Parser {
     self.stream_size = self.token_stream.len();
   }
 
-  fn next<'a>(&mut self, expected_token: Vec<TokenT>, token_has_value: Option<Vec<String>>) -> IResult<&'a str, Token> {
+  //this function get the 1 token before and after a given token and returns the stream
+  //its used to make debugging and error printing more useful
+  //like rust does with its error messages
+  //also mark the token in question with a '^' to make it easier to spot
+  fn get_token_stream(&self, token: &Token) -> Vec<String> {
+    let mut token_stream = vec![];
+    let mut token_index = 0;
+    for t in self.token_stream.iter() {
+      if t == token {
+        token_index = token_stream.len();
+      }
+      token_stream.push(t.value.clone());
+    }
+    token_stream[token_index] = format!("^{}", token_stream[token_index]);
+    token_stream
+  }
+
+  fn next(&mut self, expected_token: Vec<TokenT>, token_has_value: Option<Vec<String>>) -> Result<Token, LangError> {
     if self.current_token < self.stream_size {
       let token = &self.token_stream[self.current_token];
       if expected_token.contains(&token.token_t) {
         if let Some(values) = token_has_value {
           if values.contains(&token.value) {
             self.current_token += 1;
-            return Ok(("", token.clone()));
+            return Ok(token.clone());
           } else {
-            return Err(nom::Err::Error(Error::new("Unexpected value", nom::error::ErrorKind::Tag)));
+            return Err(LangError::new(
+              format!(
+                "Expected token value: {:?} but got: {:?}\nHere: {:#?}",
+                values,
+                token.value,
+                self.get_token_stream(token)
+              )
+              .as_str(),
+            ));
           }
         } else {
           self.current_token += 1;
-          return Ok(("", token.clone()));
+          return Ok(token.clone());
         }
       } else {
-        return Err(nom::Err::Error(Error::new("Unexpected token", nom::error::ErrorKind::Tag)));
+        return Err(LangError::new(
+          format!(
+            "Expected token type: {:?} but got: {:?}\nHere: {:#?}",
+            expected_token,
+            token.token_t,
+            self.get_token_stream(token)
+          )
+          .as_str(),
+        ));
       }
     } else {
-      return Err(nom::Err::Error(Error::new("Unexpected EOF", nom::error::ErrorKind::Tag)));
+      return Err(LangError::new("Unexpected end of token stream"));
     }
   }
 
-  fn peek<'a>(&self, expected_token: Vec<TokenT>, token_has_value: Option<Vec<String>>) -> IResult<&'a str, bool> {
+  fn peek(&self, expected_token: Vec<TokenT>, token_has_value: Option<Vec<String>>) -> Result<bool, LangError> {
     if self.current_token < self.stream_size {
       let token = &self.token_stream[self.current_token];
       if expected_token.contains(&token.token_t) {
         if let Some(values) = token_has_value {
           if values.contains(&token.value) {
-            return Ok(("", true));
+            return Ok(true);
           } else {
-            return Ok(("", false));
+            return Ok(false);
           }
         } else {
-          return Ok(("", true));
+          return Ok(true);
         }
       } else {
-        return Ok(("", false));
+        return Ok(false);
       }
     } else {
-      return Ok(("", false));
+      return Ok(false);
     }
   }
 
-  fn parse_value<'a>(&mut self, token: Token) -> IResult<&'a str, Expression> {
+  fn parse_value(&mut self, token: Token) -> Result<Expression, LangError> {
     match token.token_t {
       TokenT::INTEGER => {
         let val = token.value.parse::<i32>().unwrap();
-        Ok(("", ValueExpression::int_value(val)))
+        Ok(ValueExpression::int_value(val))
       }
       _ => unreachable!(),
     }
   }
 
-  fn next_expression<'a>(&mut self) -> IResult<&'a str, Expression> {
-    let token = self.next(vec![TokenT::INTEGER, TokenT::FLOAT], None)?;
-    Ok(match token.1.token_t {
-      TokenT::INTEGER | TokenT::FLOAT => self.parse_value(token.1)?,
+  fn next_expression<'a>(&mut self) -> Result<Expression, LangError> {
+    let token = self.next(vec![TokenT::INTEGER, TokenT::FLOAT, TokenT::BRACKET], None)?;
+    Ok(match token.token_t {
+      TokenT::INTEGER | TokenT::FLOAT => self.parse_value(token)?,
+      TokenT::BRACKET => {
+        let value = token.value.clone();
+        return match value.as_str() {
+          "(" => {
+            let expr = self.parse_expression()?;
+            self.next(vec![TokenT::BRACKET], Some(vec![")".to_string()]))?;
+            Ok(expr)
+          }
+
+          "{" => {
+            unimplemented!();
+          }
+          _ => unreachable!(),
+        };
+      }
 
       _ => unreachable!(),
     })
   }
 
-  fn parse_high_precedence_expr<'a>(&mut self) -> IResult<&'a str, Expression> {
-    let mut expr = self.next_expression()?.1;
+  fn parse_high_precedence_expr<'a>(&mut self) -> Result<Expression, LangError> {
+    let mut expr = self.next_expression()?;
 
     while self.current_token < self.stream_size {
       match self.peek(vec![TokenT::OPERATOR], None)? {
-        (_, true) => {
-          let operator = self.next(vec![TokenT::OPERATOR], None)?.1;
+        true => {
+          let operator = self.next(vec![TokenT::OPERATOR], None)?;
           let operator_value = operator.value.clone();
 
           if get_precedence(&operator_value) != 2 {
@@ -135,7 +190,7 @@ impl Parser {
             break;
           }
 
-          let next_expr = self.next_expression()?.1;
+          let next_expr = self.next_expression()?;
           expr = match operator_value.as_str() {
             "*" => MulOpr::expression(expr, next_expr),
             "/" => DivOpr::expression(expr, next_expr),
@@ -145,20 +200,20 @@ impl Parser {
         _ => break,
       }
     }
-    Ok(("", expr))
+    Ok(expr)
   }
 
-  fn parse_expression<'a>(&mut self) -> IResult<&'a str, Expression> {
-    let mut expr = self.parse_high_precedence_expr()?.1;
+  fn parse_expression<'a>(&mut self) -> Result<Expression, LangError> {
+    let mut expr = self.parse_high_precedence_expr()?;
 
     while self.current_token < self.stream_size {
       match self.peek(vec![TokenT::OPERATOR], None)? {
-        (_, true) => {
-          let operator = self.next(vec![TokenT::OPERATOR], None)?.1;
+        true => {
+          let operator = self.next(vec![TokenT::OPERATOR], None)?;
           let operator_value = operator.value.clone();
 
           if get_precedence(&operator_value) == 1 {
-            let next_expr = self.parse_high_precedence_expr()?.1;
+            let next_expr = self.parse_high_precedence_expr()?;
             expr = match operator_value.as_str() {
               "+" => AddOpr::expression(expr, next_expr),
               "-" => SubOpr::expression(expr, next_expr),
@@ -169,7 +224,7 @@ impl Parser {
         _ => break,
       }
     }
-    Ok(("", expr))
+    Ok(expr)
   }
 
   fn parse_statement(&mut self) -> Statement {
@@ -177,8 +232,7 @@ impl Parser {
     if token.is_ok() {
       unimplemented!();
     } else {
-      //it only can be a expression
-      let expr = self.parse_expression().unwrap().1;
+      let expr = self.parse_expression().unwrap();
       Statement::Expression(expr)
     }
   }
@@ -197,6 +251,12 @@ impl Parser {
 mod tests {
   use cliq_lexer::lexer::Lexer;
 
+  use crate::{expression::{
+    binary_expression::{add_opr::AddOpr, mul_opr::MulOpr},
+    value_expression::ValueExpression,
+    Expression,
+  }, statement::Statement};
+
   #[test]
   fn clear_whitespaces() {
     let mut lexer = Lexer::new();
@@ -205,6 +265,7 @@ mod tests {
     let mut parser = super::Parser::new(tokens);
     parser.clear_whitespaces();
     println!("{:#?}", parser.token_stream);
+    assert_eq!(parser.token_stream.len(), 9);
   }
 
   #[test]
@@ -216,6 +277,10 @@ mod tests {
     parser.clear_whitespaces();
     let expr = parser.next_expression();
     println!("{:#?}", expr);
+
+    assert_eq!(expr.is_ok(), true);
+    let expr = expr.unwrap();
+    assert_eq!(expr, ValueExpression::int_value(123));
   }
 
   #[test]
@@ -231,7 +296,17 @@ mod tests {
   #[test]
   fn test_complex_expression() {
     let mut lexer = Lexer::new();
-    let input = "4 + 3 - 2 + 7 - 5";
+    let input = "4 + 3 * 2 / 7 - 5";
+    let tokens = lexer.lex(input).unwrap();
+    let mut parser = super::Parser::new(tokens);
+    let ast = parser.parse();
+    println!("Parsed AST for '{}':\n{:#?}", input, ast);
+  }
+
+  #[test]
+  fn test_bracketed_expression() {
+    let mut lexer = Lexer::new();
+    let input = "(4 + 3) * 2";
     let tokens = lexer.lex(input).unwrap();
     let mut parser = super::Parser::new(tokens);
     let ast = parser.parse();

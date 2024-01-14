@@ -4,7 +4,7 @@ use super::Expression;
 
 pub mod int_value;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ValueExpression {
   IntValue(int_value::IntValue),
 }

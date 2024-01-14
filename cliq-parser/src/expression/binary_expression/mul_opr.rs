@@ -1,7 +1,7 @@
 use crate::expression::binary_expression::BinaryExpr;
 use crate::expression::Expression;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MulOpr {
   lhs: Box<Expression>,
   rhs: Box<Expression>,

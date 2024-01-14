@@ -74,11 +74,20 @@ impl Lexer {
     }
   }
 
-  pub fn lex_operator<'a>(&mut self, input: &'a str) -> IResult<&'a str, Token> {
+  fn lex_operator<'a>(&mut self, input: &'a str) -> IResult<&'a str, Token> {
     let (input, matched) = one_of("+-*/%=")(input)?;
     self.update_codepos(String::from(matched).as_str());
     let codepos = Codepos::new(self.line, self.col, None);
     let token = Token::new(TokenT::OPERATOR, matched.to_string(), codepos);
+    Ok((input, token))
+  }
+
+  fn lex_bracket<'a>(&mut self, input: &'a str) -> IResult<&'a str, Token> {
+    //=> (), [], {}
+    let (input, matched) = one_of("()[]{}")(input)?;
+    self.update_codepos(String::from(matched).as_str());
+    let codepos = Codepos::new(self.line, self.col, None);
+    let token = Token::new(TokenT::BRACKET, matched.to_string(), codepos);
     Ok((input, token))
   }
 
@@ -94,6 +103,8 @@ impl Lexer {
       } else if let Ok(result) = self.lex_integer(current_input) {
         result
       } else if let Ok(result) = self.lex_operator(current_input) {
+        result
+      } else if let Ok(result) = self.lex_bracket(current_input) {
         result
       } else {
         return Err(format!("Unexpected character at line {}, column {}", self.line, self.col));
@@ -116,6 +127,14 @@ mod tests {
   fn test_lexer() {
     let mut lexer = Lexer::new();
     let input = "  123 + 321 * 123 / 312 - 123";
+    let tokens = lexer.lex(input).unwrap();
+    println!("{:#?}", tokens);
+  }
+
+  #[test]
+  fn test_lexer_bracket() {
+    let mut lexer = Lexer::new();
+    let input = "  (123 + 321) * 123 / 312 - 123";
     let tokens = lexer.lex(input).unwrap();
     println!("{:#?}", tokens);
   }

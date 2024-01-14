@@ -24,7 +24,6 @@ name = "cliq-parser"
 version = "0.1.0"
 dependencies = [
  "cliq-lexer",
- "nom",
 ]
 
 [[package]]
