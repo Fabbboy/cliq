@@ -1,8 +1,10 @@
+use serde::Serialize;
+
 use crate::expression::Expression;
 
 use super::ValueExpression;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct IntValue {
   value: i32,
 }

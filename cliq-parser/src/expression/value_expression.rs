@@ -1,10 +1,12 @@
+use serde::Serialize;
+
 use self::int_value::IntValue;
 
 use super::Expression;
 
 pub mod int_value;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum ValueExpression {
   IntValue(int_value::IntValue),
 }

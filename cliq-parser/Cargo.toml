@@ -7,3 +7,5 @@ edition = "2021"
 
 [dependencies]
 cliq-lexer = { path = "../cliq-lexer" }
+serde = { workspace = true }
+serde_json = { workspace = true }

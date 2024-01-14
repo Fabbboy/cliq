@@ -15,6 +15,7 @@ pub struct Parser {
   token_stream: Vec<Token>,
   current_token: usize,
   stream_size: usize,
+  ast: Vec<Statement>,
 }
 
 fn get_precedence(opr: &str) -> i32 {
@@ -51,6 +52,7 @@ impl Parser {
       stream_size: input_tokens.len(),
       token_stream: input_tokens,
       current_token: 0,
+      ast: vec![],
     }
   }
 
@@ -237,13 +239,17 @@ impl Parser {
     }
   }
 
+  pub fn serialize_ast(&self) -> String {
+    serde_json::to_string(&self.ast).unwrap_or_else(|err| format!("Error serializing AST: {}", err))
+  }
+
   pub fn parse(&mut self) -> Vec<Statement> {
     self.clear_whitespaces();
-    let mut stmts = vec![];
     while self.token_stream.get(self.current_token) != None {
-      stmts.push(self.parse_statement());
+      let stmt = self.parse_statement();
+      self.ast.push(stmt);
     }
-    stmts
+    self.ast.clone()
   }
 }
 
@@ -251,11 +257,7 @@ impl Parser {
 mod tests {
   use cliq_lexer::lexer::Lexer;
 
-  use crate::{expression::{
-    binary_expression::{add_opr::AddOpr, mul_opr::MulOpr},
-    value_expression::ValueExpression,
-    Expression,
-  }, statement::Statement};
+  use crate::expression::value_expression::ValueExpression;
 
   #[test]
   fn clear_whitespaces() {
@@ -311,5 +313,17 @@ mod tests {
     let mut parser = super::Parser::new(tokens);
     let ast = parser.parse();
     println!("Parsed AST for '{}':\n{:#?}", input, ast);
+  }
+
+  #[test]
+  fn test_serialize_ast() {
+    let mut lexer = Lexer::new();
+    let input = "(4 + 3) * 2";
+    let tokens = lexer.lex(input).unwrap();
+    let mut parser = super::Parser::new(tokens);
+    let ast = parser.parse();
+    println!("Parsed AST for '{}':\n{:#?}", input, ast);
+    let serialized_ast = parser.serialize_ast();
+    println!("Serialized AST for '{}':\n{}", input, serialized_ast);
   }
 }

@@ -1,6 +1,7 @@
 use crate::{token_t::TokenT, codepos::Codepos};
+use serde::Serialize;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Token {
   pub token_t: TokenT,
   pub value: String,

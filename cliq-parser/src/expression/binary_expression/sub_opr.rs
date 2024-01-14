@@ -1,7 +1,9 @@
+use serde::Serialize;
+
 use crate::expression::binary_expression::BinaryExpr;
 use crate::expression::Expression;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct SubOpr {
   lhs: Box<Expression>,
   rhs: Box<Expression>,
