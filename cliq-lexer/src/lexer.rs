@@ -91,6 +91,32 @@ impl Lexer {
     Ok((input, token))
   }
 
+  fn lex_identifier<'a>(&mut self, input: &'a str) -> IResult<&'a str, Token> {
+    let identifier_regex = Regex::new(r"^[a-zA-Z_][a-zA-Z0-9_]*").unwrap();
+    if let Some(mat) = identifier_regex.find(input) {
+      let matched = &input[..mat.end()];
+      self.update_codepos(matched);
+      let codepos = Codepos::new(self.line, self.col, None);
+      let token = Token::new(TokenT::IDENTIFIER, matched.to_string(), codepos);
+      Ok((&input[mat.end()..], token))
+    } else {
+      Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Alpha)))
+    }
+  }
+
+  fn lex_k_var<'a>(&mut self, input: &'a str) -> IResult<&'a str, Token> {
+    let var_regex = Regex::new(r"^var").unwrap();
+    if let Some(mat) = var_regex.find(input) {
+      let matched = &input[..mat.end()];
+      self.update_codepos(matched);
+      let codepos = Codepos::new(self.line, self.col, None);
+      let token = Token::new(TokenT::VAR, matched.to_string(), codepos);
+      Ok((&input[mat.end()..], token))
+    } else {
+      Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Alpha)))
+    }
+  }
+
   pub fn lex(&mut self, input: &str) -> Result<Vec<Token>, String> {
     let mut tokens = Vec::new();
     let mut current_input = input;
@@ -105,6 +131,10 @@ impl Lexer {
       } else if let Ok(result) = self.lex_operator(current_input) {
         result
       } else if let Ok(result) = self.lex_bracket(current_input) {
+        result
+      } else if let Ok(result) = self.lex_k_var(current_input) {
+        result
+      } else if let Ok(result) = self.lex_identifier(current_input) {
         result
       } else {
         return Err(format!("Unexpected character at line {}, column {}", self.line, self.col));
@@ -135,6 +165,22 @@ mod tests {
   fn test_lexer_bracket() {
     let mut lexer = Lexer::new();
     let input = "  (123 + 321) * 123 / 312 - 123";
+    let tokens = lexer.lex(input).unwrap();
+    println!("{:#?}", tokens);
+  }
+
+  #[test]
+  fn test_lexer_identifier() {
+    let mut lexer = Lexer::new();
+    let input = "cooler spast";
+    let tokens = lexer.lex(input).unwrap();
+    println!("{:#?}", tokens);
+  }
+
+  #[test]
+  fn test_lexer_var() {
+    let mut lexer = Lexer::new();
+    let input = "var cooler = 123";
     let tokens = lexer.lex(input).unwrap();
     println!("{:#?}", tokens);
   }

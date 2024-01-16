@@ -1,0 +1,67 @@
+[
+  {
+    "Assign": {
+      "variable": { "VariableExpression": { "name": "hello" } },
+      "value": {
+        "BinaryExpression": {
+          "AddOpr": {
+            "lhs": {
+              "BinaryExpression": {
+                "MulOpr": {
+                  "lhs": {
+                    "BinaryExpression": {
+                      "AddOpr": {
+                        "lhs": { "VariableExpression": { "name": "ab" } },
+                        "rhs": {
+                          "ValueExpression": {
+                            "FloatValue": { "value": 123.3 }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "rhs": {
+                    "BinaryExpression": {
+                      "SubOpr": {
+                        "lhs": { "VariableExpression": { "name": "ac" } },
+                        "rhs": {
+                          "BinaryExpression": {
+                            "MulOpr": {
+                              "lhs": {
+                                "BinaryExpression": {
+                                  "AddOpr": {
+                                    "lhs": {
+                                      "ValueExpression": {
+                                        "IntValue": { "value": 33 }
+                                      }
+                                    },
+                                    "rhs": {
+                                      "ValueExpression": {
+                                        "IntValue": { "value": 22 }
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "rhs": {
+                                "ValueExpression": {
+                                  "IntValue": { "value": 2 }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "rhs": { "ValueExpression": { "IntValue": { "value": 2 } } }
+          }
+        }
+      },
+      "mutable": false
+    }
+  }
+]

@@ -7,10 +7,14 @@ pub enum TokenT {
   //VALUES
   INTEGER,
   FLOAT,
+  IDENTIFIER,
 
   //OPERATOR
   OPERATOR, // + * - / % =
 
   //SYMBOL
   BRACKET, // ( ) [ ] { }
+
+  //KEYWORD
+  VAR, //used for variable declaration always immutable
 }

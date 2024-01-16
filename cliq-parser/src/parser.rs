@@ -4,9 +4,9 @@ use crate::{
   expression::{
     binary_expression::{add_opr::AddOpr, div_opr::DivOpr, mul_opr::MulOpr, sub_opr::SubOpr},
     value_expression::ValueExpression,
-    Expression,
+    Expression, variable_expression::VariableExpression,
   },
-  statement::Statement,
+  statement::{assign_stmt::AssignStmt, Statement},
 };
 
 pub struct Parser {
@@ -150,12 +150,16 @@ impl Parser {
         let val = token.value.parse::<i32>().unwrap();
         Ok(ValueExpression::int_value(val))
       }
+      TokenT::FLOAT => {
+        let val = token.value.parse::<f32>().unwrap();
+        Ok(ValueExpression::float_value(val))
+      }
       _ => unreachable!(),
     }
   }
 
   fn next_expression<'a>(&mut self) -> Result<Expression, LangError> {
-    let token = self.next(vec![TokenT::INTEGER, TokenT::FLOAT, TokenT::BRACKET], None)?;
+    let token = self.next(vec![TokenT::INTEGER, TokenT::FLOAT, TokenT::BRACKET, TokenT::IDENTIFIER], None)?;
     Ok(match token.token_t {
       TokenT::INTEGER | TokenT::FLOAT => self.parse_value(token)?,
       TokenT::BRACKET => {
@@ -172,6 +176,9 @@ impl Parser {
           }
           _ => unreachable!(),
         };
+      }
+      TokenT::IDENTIFIER => {
+        VariableExpression::expression(token.value.clone())
       }
 
       _ => unreachable!(),
@@ -206,7 +213,7 @@ impl Parser {
   }
 
   fn parse_expression<'a>(&mut self) -> Result<Expression, LangError> {
-    let mut expr = self.parse_high_precedence_expr()?;
+    let mut expr: Expression = self.parse_high_precedence_expr()?;
 
     while self.current_token < self.stream_size {
       match self.peek(vec![TokenT::OPERATOR], None)? {
@@ -229,14 +236,26 @@ impl Parser {
     Ok(expr)
   }
 
-  fn parse_statement(&mut self) -> Statement {
-    let token = self.next(vec![], None);
+  fn parse_statement(&mut self) -> Result<Statement, LangError> {
+    let token = self.next(vec![TokenT::VAR], None);
     if token.is_ok() {
-      unimplemented!();
+      let token = token.unwrap();
+      match token.token_t {
+        TokenT::VAR => self.parse_variable_assignment(),
+        _ => unreachable!(),
+      }
     } else {
       let expr = self.parse_expression().unwrap();
-      Statement::Expression(expr)
+      Ok(Statement::Expression(expr))
     }
+  }
+
+  fn parse_variable_assignment(&mut self) -> Result<Statement, LangError> {
+    let variable = self.next(vec![TokenT::IDENTIFIER], None).unwrap();
+    let variable = VariableExpression::expression(variable.value.clone());  
+    self.next(vec![TokenT::OPERATOR], Some(vec!["=".to_string()])).unwrap();
+    let expression = self.parse_expression().unwrap();
+    Ok(AssignStmt::statement(variable, expression, false))
   }
 
   pub fn serialize_ast(&self) -> String {
@@ -245,9 +264,14 @@ impl Parser {
 
   pub fn parse(&mut self) -> Vec<Statement> {
     self.clear_whitespaces();
+    let mut errors: Vec<LangError> = vec![];
     while self.token_stream.get(self.current_token) != None {
       let stmt = self.parse_statement();
-      self.ast.push(stmt);
+      if stmt.is_err() {
+        errors.push(stmt.err().unwrap());
+      } else {
+        self.ast.push(stmt.unwrap());
+      }
     }
     self.ast.clone()
   }
@@ -319,6 +343,18 @@ mod tests {
   fn test_serialize_ast() {
     let mut lexer = Lexer::new();
     let input = "(4 + 3) * 2";
+    let tokens = lexer.lex(input).unwrap();
+    let mut parser = super::Parser::new(tokens);
+    let ast = parser.parse();
+    println!("Parsed AST for '{}':\n{:#?}", input, ast);
+    let serialized_ast = parser.serialize_ast();
+    println!("Serialized AST for '{}':\n{}", input, serialized_ast);
+  }
+
+  #[test]
+  fn test_parse_variable_def() {
+    let mut lexer = Lexer::new();
+    let input = "var hello = ((ab + 123.3) * (ac - (33 + 22) * 2)) + 2";
     let tokens = lexer.lex(input).unwrap();
     let mut parser = super::Parser::new(tokens);
     let ast = parser.parse();
